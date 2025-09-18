@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Typing Speed Tester</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .quote-display {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-left: 5px solid #4CAF50;
+            font-size: 18px;
+            line-height: 1.6;
+        }
+        .author {
+            text-align: right;
+            font-style: italic;
+            color: #555;
+            margin-top: 10px;
+        }
+        .textarea {
+            width: 100%;
+            height: 150px;
+            padding: 12px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            resize: none;
+        }
+        .textarea:focus {
+            border-color: #4CAF50;
+            outline: none;
+        }
+        .correct {
+            color: #4CAF50;
+        }
+        .incorrect {
+            color: #f44336;
+            text-decoration: underline;
+        }
+        .timer {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e8f5e9;
+            border-radius: 5px;
+            display: none;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Typing Speed Test</h1>
+        <div class="quote-display" id="quoteDisplay"></div>
+        <textarea id="textarea" class="textarea" placeholder="Start typing here..." autofocus></textarea>
+        <div class="timer" id="timer">00:00</div>
+        <button id="restartButton">New Quote</button>
+        <div class="results" id="results">
+            <h2>Your Results</h2>
+            <p>Words Per Minute: <span id="wpm"></span></p>
+            <p>Accuracy: <span id="accuracy"></span>%</p>
+            <p>Time: <span id="timeTaken"></span> seconds</p>
+        </div>
+    </div>
+
+    <script>
+        const quoteDisplay = document.getElementById('quoteDisplay')
+        const textarea = document.getElementById('textarea')
+        const timer = document.getElementById('timer')
+        const restartButton = document.getElementById('restartButton')
+        const results = document.getElementById('results')
+        const wpmSpan = document.getElementById('wpm')
+        const accuracySpan = document.getElementById('accuracy')
+        const timeTakenSpan = document.getElementById('timeTaken')
+
+        let startTime
+        let interval
+        let originalText = ''
+
+        function getNewQuote() {
+            fetch('/get_quote')
+                .then(response => response.json())
+                .then(data => {
+                    originalText = data.quote
+                    quoteDisplay.innerHTML = originalText + `<div class="author">- ${data.author}</div>`
+                    textarea.value = ''
+                    results.style.display = 'none'
+                    textarea.disabled = false
+                    textarea.focus()
+                    startTimer()
+                })
+        }
+
+        function startTimer() {
+            clearInterval(interval)
+            startTime = new Date()
+            interval = setInterval(() => {
+                const elapsedTime = new Date() - startTime
+                const seconds = Math.floor(elapsedTime / 1000)
+                const minutes = Math.floor(seconds / 60)
+                timer.innerHTML = `${minutes.toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`
+            }, 1000)
+        }
+
+        function checkResults() {
+            clearInterval(interval)
+            const elapsedTime = (new Date() - startTime) / 1000
+            const typedText = textarea.value
+
+            fetch('/check_results', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    original_text: originalText,
+                    typed_text: typedText,
+                    time_taken: elapsedTime
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                wpmSpan.textContent = data.wpm
+                accuracySpan.textContent = data.accuracy
+                timeTakenSpan.textContent = data.time_taken
+                results.style.display = 'block'
+                textarea.disabled = true
+            })
+        }
+
+        textarea.addEventListener('input', () => {
+            const arrayQuote = originalText.split('')
+            const arrayValue = textarea.value.split('')
+
+            let html = ''
+            arrayQuote.forEach((character, index) => {
+                if (index < arrayValue.length) {
+                    if (character === arrayValue[index]) {
+                        html += `<span class="correct">${character}</span>`
+                    } else {
+                        html += `<span class="incorrect">${character}</span>`
+                    }
+                } else {
+                    html += character
+                }
+            })
+            quoteDisplay.innerHTML = html + `<div class="author">- ${quoteDisplay.querySelector('.author').textContent}</div>`
+
+            if (textarea.value === originalText) {
+                checkResults()
+            }
+        })
+
+        restartButton.addEventListener('click', getNewQuote)
+
+        // Initialize
+        getNewQuote()
+    </script>
+</body>
+</html>
